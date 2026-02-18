@@ -1,2 +1,567 @@
-[InternetShortcut]
-URL=https://github.com/dazzdg-dev/Task-Pulse-Smart/blob/main/index.html
+<!-- ===========================
+ Task Pulse Smart — Meds Widget (Android / Mobile)
+ Version: V10.6 Meds Module (standalone)
+ - Morning/Night logging (tap to log / long-press to undo)
+ - 12-hour countdown from last logged dose (morning OR night)
+ - Banner: “Morning meds not taken / Night meds not taken”
+ - Adherence: 7d + 30d + streak + best
+ - LocalStorage persistence (no backend required)
+ ============================ -->
+
+<div class="tp-meds-widget" id="tpMedsWidget">
+  <div class="tp-card">
+    <div class="tp-head">
+      <div class="tp-title">Medication — Today</div>
+      <div class="tp-tag">TLE routine</div>
+    </div>
+
+    <div id="tpMedsBanner" class="tp-banner" style="display:none;"></div>
+
+    <div class="tp-row">
+      <button id="tpBtnMorn" class="tp-dose" type="button" aria-label="Log Morning Dose"></button>
+      <button id="tpBtnNight" class="tp-dose" type="button" aria-label="Log Night Dose"></button>
+    </div>
+
+    <div id="tpNextDoseBar" class="tp-next" style="display:none;">
+      <div class="tp-next-left">
+        <div class="tp-next-label">NEXT DOSE</div>
+      </div>
+      <div class="tp-next-time" id="tpNextDoseTime">—</div>
+    </div>
+
+    <div class="tp-kpis" id="tpMedsKpis"></div>
+    <div class="tp-meta" id="tpMedsMeta"></div>
+
+    <div class="tp-actions">
+      <button class="tp-ghost" type="button" id="tpMedsExport">Export</button>
+      <button class="tp-ghost" type="button" id="tpMedsImportBtn">Import</button>
+      <button class="tp-danger" type="button" id="tpMedsReset">Reset</button>
+      <input id="tpMedsImport" type="file" accept="application/json" style="display:none" />
+    </div>
+
+    <div class="tp-foot">Tip: long-press a dose to undo without prompts.</div>
+  </div>
+</div>
+
+<style>
+  .tp-meds-widget{
+    --bg:#050611;
+    --card:#141725;
+    --ink:#e9ecf5;
+    --muted:#a7b0cf;
+    --line:#262a3c;
+
+    --doseBg:#070a18;
+    --doseEdge:#2b3b56;
+
+    /* Taken state = warm border glow (NOT neon fill) */
+    --takenEdge:rgba(255,157,59,.78);
+    --takenGlow:rgba(255,157,59,.18);
+    --takenSub:#ffd8a2;
+
+    --tagBg:#101828;
+    --tagEdge:#294064;
+    --tagInk:#9fd2ff;
+
+    --bannerBg:rgba(32,28,10,.62);
+    --bannerEdge:#3b3a1c;
+    --bannerInk:#ffe3a3;
+
+    --timerA:rgba(80,103,255,.98);
+    --timerB:rgba(80,103,255,.82);
+    --timerInk:#eef2ff;
+
+    --radius:18px;
+    --r2:14px;
+    --tap:56px;
+
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  }
+
+  .tp-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px;
+    box-shadow:0 10px 38px rgba(0,0,0,.35);
+    color:var(--ink);
+    max-width:520px;
+  }
+
+  .tp-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .tp-title{
+    font-weight:900;
+    font-size:18px;
+    letter-spacing:.2px;
+  }
+  .tp-tag{
+    font-size:12px;
+    padding:4px 12px;
+    border-radius:999px;
+    background:var(--tagBg);
+    border:1px solid var(--tagEdge);
+    color:var(--tagInk);
+    white-space:nowrap;
+  }
+
+  .tp-banner{
+    border-radius:14px;
+    border:1px solid var(--bannerEdge);
+    background:var(--bannerBg);
+    color:var(--bannerInk);
+    padding:10px 12px;
+    font-size:13px;
+    line-height:1.25;
+    margin-bottom:12px;
+  }
+
+  .tp-row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .tp-dose{
+    flex:1 1 240px;
+    min-width:0;
+    min-height:var(--tap);
+    border-radius:20px;
+    padding:14px 14px;
+    background:linear-gradient(180deg, rgba(7,10,24,1), rgba(5,8,20,1));
+    border:1px solid var(--doseEdge);
+    text-align:left;
+    color:var(--ink);
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .18s ease, border-color .18s ease;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
+    position:relative;
+    overflow:hidden;
+  }
+  .tp-dose:active{ transform:scale(.99); }
+  .tp-dose .tp-topline{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .tp-dose .tp-icon{
+    width:24px;
+    text-align:center;
+    font-size:18px;
+    filter:drop-shadow(0 6px 18px rgba(0,0,0,.35));
+  }
+  .tp-dose .tp-name{
+    font-size:16px;
+    font-weight:900;
+    letter-spacing:.2px;
+  }
+  .tp-dose .tp-sub{
+    margin-top:6px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* Taken styling: warm border + subtle glow, no bright fill */
+  .tp-dose.taken{
+    border-color:var(--takenEdge);
+    box-shadow:0 0 0 2px var(--takenGlow), 0 0 22px rgba(255,157,59,.10);
+  }
+  .tp-dose.taken .tp-sub{ color:var(--takenSub); }
+
+  /* one-shot pulse when logged */
+  .tp-dose.pulse{ animation:tpPulse .55s ease-out 1; }
+  @keyframes tpPulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,157,59,0); }
+    40%{ box-shadow:0 0 0 4px rgba(255,157,59,.18); }
+    100%{ box-shadow:0 0 0 0 rgba(255,157,59,0); }
+  }
+
+  .tp-next{
+    margin-top:12px;
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,.10);
+    background:linear-gradient(90deg, var(--timerA), var(--timerB));
+    color:var(--timerInk);
+    padding:14px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .tp-next-label{
+    font-size:11px;
+    letter-spacing:.18em;
+    opacity:.95;
+  }
+  .tp-next-time{
+    font-size:20px;
+    font-weight:950;
+    letter-spacing:.3px;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .tp-kpis{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:12px;
+  }
+  .tp-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.04);
+    font-size:12px;
+    color:#cbd6ff;
+  }
+  .tp-chip strong{
+    color:#fff;
+    font-weight:950;
+  }
+
+  .tp-meta{
+    margin-top:10px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.25;
+  }
+
+  .tp-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:12px;
+  }
+  .tp-ghost, .tp-danger{
+    min-height:44px;
+    padding:10px 12px;
+    border-radius:999px;
+    background:transparent;
+    cursor:pointer;
+    font-weight:800;
+    letter-spacing:.1px;
+  }
+  .tp-ghost{
+    border:1px solid rgba(255,255,255,.14);
+    color:#cbd6ff;
+  }
+  .tp-danger{
+    border:1px solid rgba(255,120,140,.75);
+    color:#ff9ba9;
+    background:rgba(255,120,140,.08);
+  }
+
+  .tp-foot{
+    margin-top:10px;
+    font-size:11px;
+    color:rgba(167,176,207,.9);
+  }
+
+  @media (max-width:420px){
+    .tp-card{ padding:12px; border-radius:16px; }
+    .tp-title{ font-size:17px; }
+    .tp-next-time{ font-size:18px; }
+  }
+</style>
+
+<script>
+/* ===========================
+   Meds Widget Logic (standalone)
+   LocalStorage key: tp_meds_v2
+   Data format:
+     meds[YYYY-MM-DD] = { morning: ISOString|'', night: ISOString|'' }
+   Countdown:
+     12h from last logged dose (morning OR night), even if morning missed.
+   =========================== */
+
+(function(){
+  const LS_MEDS = 'tp_meds_v2';
+  const el = (id)=>document.getElementById(id);
+
+  let meds = load(LS_MEDS, {});
+  let timer = null;
+
+  function isoToday(){ return new Date().toISOString().slice(0,10); }
+  function fmtDateTime(iso){
+    try{
+      const d = new Date(iso);
+      const date = d.toLocaleDateString(undefined,{day:'2-digit',month:'2-digit',year:'numeric'});
+      const time = d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+      return `${date} · ${time}`;
+    }catch{ return '—'; }
+  }
+  function load(k, def){
+    try{
+      const v = JSON.parse(localStorage.getItem(k)||'null');
+      return (v ?? def);
+    }catch(e){ return def; }
+  }
+  function save(){
+    localStorage.setItem(LS_MEDS, JSON.stringify(meds));
+  }
+  function medsFor(day){
+    if(!meds[day]) meds[day] = { morning:'', night:'' };
+    return meds[day];
+  }
+  function latestDoseIso(day){
+    const m = medsFor(day);
+    const a = m.morning ? Date.parse(m.morning) : 0;
+    const b = m.night ? Date.parse(m.night) : 0;
+    if(!a && !b) return '';
+    return (b>a) ? m.night : m.morning;
+  }
+  function nextDoseTarget(day){
+    const last = latestDoseIso(day);
+    if(!last) return null;
+    return new Date(Date.parse(last) + 12*60*60*1000);
+  }
+  function formatCountdown(ms){
+    const s = Math.max(0, Math.floor(ms/1000));
+    const hh = Math.floor(s/3600);
+    const mm = Math.floor((s%3600)/60);
+    const ss = s%60;
+    return `${String(hh).padStart(2,'0')}h ${String(mm).padStart(2,'0')}m ${String(ss).padStart(2,'0')}s`;
+  }
+
+  function adherence(daysBack){
+    let taken=0, total=0;
+    const today = isoToday();
+    for(let i=0;i<daysBack;i++){
+      const d = new Date(today);
+      d.setDate(d.getDate()-i);
+      const key = d.toISOString().slice(0,10);
+      const m = medsFor(key);
+      total += 2;
+      if(m.morning) taken++;
+      if(m.night) taken++;
+    }
+    const pct = total ? Math.round((taken/total)*100) : 0;
+    return { taken, total, pct };
+  }
+  function streak(){
+    // consecutive full days from today backwards
+    let s=0;
+    const today = isoToday();
+    for(let i=0;i<365;i++){
+      const d = new Date(today);
+      d.setDate(d.getDate()-i);
+      const key = d.toISOString().slice(0,10);
+      const m = medsFor(key);
+      if(m.morning && m.night) s++;
+      else break;
+    }
+    return s;
+  }
+  function bestStreak(){
+    let best=0, cur=0;
+    const today = isoToday();
+    for(let i=0;i<365;i++){
+      const d = new Date(today);
+      d.setDate(d.getDate()-i);
+      const key = d.toISOString().slice(0,10);
+      const m = medsFor(key);
+      if(m.morning && m.night){ cur++; best=Math.max(best,cur); }
+      else cur=0;
+    }
+    return best;
+  }
+
+  function setBanner(day){
+    const banner = el('tpMedsBanner');
+    const m = medsFor(day);
+    const missing = [];
+    if(!m.morning) missing.push('Morning meds not taken');
+    if(!m.night) missing.push('Night meds not taken');
+
+    if(!missing.length){
+      banner.style.display='none';
+      banner.textContent='';
+      return;
+    }
+    banner.style.display='block';
+    banner.textContent = missing.join(' • ');
+  }
+
+  function render(){
+    const day = isoToday();
+    const m = medsFor(day);
+
+    // Buttons
+    const btnM = el('tpBtnMorn');
+    const btnN = el('tpBtnNight');
+
+    btnM.className = 'tp-dose' + (m.morning ? ' taken':'');
+    btnM.innerHTML = `
+      <div class="tp-topline">
+        <div class="tp-icon">🌅</div>
+        <div class="tp-name">Morning Dose</div>
+      </div>
+      <div class="tp-sub">${m.morning ? `Logged · ${fmtDateTime(m.morning)}` : 'Tap to log'}</div>
+    `;
+
+    btnN.className = 'tp-dose' + (m.night ? ' taken':'');
+    btnN.innerHTML = `
+      <div class="tp-topline">
+        <div class="tp-icon">🌙</div>
+        <div class="tp-name">Night Dose</div>
+      </div>
+      <div class="tp-sub">${m.night ? `Logged · ${fmtDateTime(m.night)}` : 'Tap to log'}</div>
+    `;
+
+    // Meta line
+    el('tpMedsMeta').textContent =
+      `${m.morning ? 'Morning: '+fmtDateTime(m.morning) : 'Morning: —'}   •   ${m.night ? 'Night: '+fmtDateTime(m.night) : 'Night: —'}`;
+
+    // KPIs
+    const a7 = adherence(7);
+    const a30 = adherence(30);
+    el('tpMedsKpis').innerHTML = `
+      <span class="tp-chip">7-day <strong>${a7.pct}%</strong></span>
+      <span class="tp-chip">30-day <strong>${a30.pct}%</strong></span>
+      <span class="tp-chip">Streak <strong>${streak()}</strong></span>
+      <span class="tp-chip">Best <strong>${bestStreak()}</strong></span>
+    `;
+
+    setBanner(day);
+
+    // Timer
+    tick();
+    if(timer) clearInterval(timer);
+    timer = setInterval(tick, 1000);
+  }
+
+  function tick(){
+    const day = isoToday();
+    const bar = el('tpNextDoseBar');
+    const out = el('tpNextDoseTime');
+    const target = nextDoseTarget(day);
+
+    if(!target){
+      bar.style.display='none';
+      out.textContent='—';
+      return;
+    }
+    let ms = target - new Date();
+    if(ms < 0) ms = 0; // hold at 0 until next log
+    bar.style.display='flex';
+    out.textContent = formatCountdown(ms);
+  }
+
+  function pulse(btn){
+    btn.classList.add('pulse');
+    setTimeout(()=>btn.classList.remove('pulse'), 600);
+  }
+
+  // Tap to log / undo with confirm
+  function toggleDose(which){
+    const day = isoToday();
+    const m = medsFor(day);
+    const was = !!m[which];
+
+    if(was){
+      if(!confirm('Unmark this dose as taken?')) return;
+      m[which] = '';
+    }else{
+      m[which] = new Date().toISOString();
+    }
+    save();
+    render();
+
+    if(!was){
+      pulse(which==='morning' ? el('tpBtnMorn') : el('tpBtnNight'));
+      // Optional haptic feedback (Android)
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+  }
+
+  // Long press = undo without confirm
+  function bindLongPress(button, which){
+    let t=null;
+    const start = (e)=>{
+      e.preventDefault?.();
+      t=setTimeout(()=>{
+        const day = isoToday();
+        const m = medsFor(day);
+        if(m[which]){
+          m[which]='';
+          save();
+          render();
+          if(navigator.vibrate) navigator.vibrate([10,30,10]);
+        }
+      }, 520);
+    };
+    const end = ()=>{ if(t) clearTimeout(t); t=null; };
+
+    button.addEventListener('touchstart', start, {passive:false});
+    button.addEventListener('touchend', end);
+    button.addEventListener('touchcancel', end);
+    button.addEventListener('mousedown', start);
+    button.addEventListener('mouseup', end);
+    button.addEventListener('mouseleave', end);
+  }
+
+  // Export / Import / Reset
+  el('tpMedsExport').addEventListener('click', ()=>{
+    const payload = { app:'taskpulse', module:'meds', v:'10.6', exportedAt:new Date().toISOString(), meds };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'taskpulse_meds_backup.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  el('tpMedsImportBtn').addEventListener('click', ()=> el('tpMedsImport').click());
+  el('tpMedsImport').addEventListener('change', async (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    try{
+      const text = await f.text();
+      const data = JSON.parse(text);
+      if(data && data.meds && typeof data.meds === 'object'){
+        meds = data.meds;
+        save();
+        render();
+        alert('Meds imported successfully.');
+      }else{
+        alert('Invalid file format.');
+      }
+    }catch(err){
+      alert('Import failed: ' + err.message);
+    }finally{
+      e.target.value = '';
+    }
+  });
+
+  el('tpMedsReset').addEventListener('click', ()=>{
+    if(!confirm('Reset meds logs (this widget only)?')) return;
+    meds = {};
+    save();
+    render();
+  });
+
+  // Wire taps
+  el('tpBtnMorn').addEventListener('click', ()=>toggleDose('morning'));
+  el('tpBtnNight').addEventListener('click', ()=>toggleDose('night'));
+
+  // Long-press undo
+  bindLongPress(el('tpBtnMorn'), 'morning');
+  bindLongPress(el('tpBtnNight'), 'night');
+
+  // Initial render
+  render();
+})();
+</script>
