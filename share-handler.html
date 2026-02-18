@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Task Pulse Smart — Share Handler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <style>
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:#05060a;
+      color:#f6f7ff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+    }
+    .card{
+      padding:20px 22px;
+      border-radius:16px;
+      background:#101320;
+      box-shadow:0 14px 45px rgba(0,0,0,.55);
+      max-width:420px;
+    }
+    h1{font-size:20px;margin:0 0 8px}
+    p{margin:0;color:#a8b2d4;font-size:14px;line-height:1.5}
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Opening Task Pulse…</h1>
+  <p>If nothing happens, you can close this tab and open Task Pulse Smart manually.</p>
+</div>
+<script>
+(function(){
+  const params = new URLSearchParams(location.search);
+  const title = params.get('title') || '';
+  const text  = params.get('text')  || '';
+  const url   = params.get('url')   || '';
+  let payload = '';
+  if(title) payload += title + '\n';
+  if(text)  payload += text + '\n';
+  if(url)   payload += url;
+  const target = './#shared=' + encodeURIComponent(payload.trim());
+  // Give the page a moment to paint, then redirect
+  setTimeout(()=>{ location.replace(target); }, 250);
+})();
+</script>
+</body>
+</html>
