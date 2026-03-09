@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>Task Pulse Smart — Meds</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --card:#121a24;
+      --muted:#93a4b8;
+      --text:#eaf1fb;
+      --good:#25c26e;
+      --warn:#ffb020;
+      --bad:#ff4d4d;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --r:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:radial-gradient(1200px 800px at 20% -10%, rgba(64,156,255,.18), transparent 60%),
+                 radial-gradient(900px 700px at 100% 0%, rgba(37,194,110,.10), transparent 55%),
+                 var(--bg);
+      color:var(--text);
+      padding:16px;
+    }
+    .splash{
+      position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+      background:radial-gradient(1200px 800px at 20% -10%, rgba(64,156,255,.18), transparent 60%),
+                 radial-gradient(900px 700px at 100% 0%, rgba(37,194,110,.10), transparent 55%),
+                 #0b0f14;
+      transition:opacity .35s ease, visibility .35s ease;
+    }
+    .splash.hidden{opacity:0; visibility:hidden; pointer-events:none}
+    .splashCard{
+      width:min(92vw,420px); border-radius:28px; overflow:hidden; border:1px solid rgba(255,255,255,.08);
+      box-shadow:var(--shadow); background:#121a24;
+    }
+    .splashCard img{display:block; width:100%; height:auto}
+    .wrap{max-width:560px;margin:0 auto}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.06); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden;
+    }
+    .head{padding:16px 16px 10px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; border-bottom:1px solid rgba(255,255,255,.06)}
+    .title{font-weight:700; letter-spacing:.2px; font-size:16px; line-height:1.2}
+    .sub{color:var(--muted); font-size:12px; margin-top:4px}
+    .tag{font-size:11px; padding:6px 10px; border-radius:999px; background:rgba(64,156,255,.12); border:1px solid rgba(64,156,255,.22); color:#bfe0ff; white-space:nowrap; margin-top:2px}
+    .banner{display:none; padding:10px 12px; margin:12px 16px 0; border-radius:14px; border:1px solid rgba(255,255,255,.08); background:rgba(255,176,32,.10); color:#ffd89a; font-size:12px; line-height:1.3}
+    .grid{display:grid; gap:12px; padding:14px 16px 16px}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    .doseBtn{position:relative; width:100%; border:1px solid rgba(255,255,255,.08); background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border-radius:16px; padding:14px 12px; text-align:left; color:var(--text); cursor:pointer; touch-action:manipulation; user-select:none; -webkit-tap-highlight-color:transparent}
+    .doseBtn:active{transform:translateY(1px)}
+    .doseTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .doseName{font-weight:700;font-size:14px}
+    .statusPill{font-size:11px; padding:5px 9px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.06); color:var(--muted); white-space:nowrap}
+    .statusPill.good{background:rgba(37,194,110,.14); border-color:rgba(37,194,110,.24); color:#bff2d3}
+    .statusPill.bad{background:rgba(255,77,77,.12); border-color:rgba(255,77,77,.22); color:#ffb3b3}
+    .doseMeta{margin-top:10px; color:var(--muted); font-size:12px; display:flex; justify-content:space-between; gap:10px}
+    .countdown{font-variant-numeric:tabular-nums; color:#d9e6f7}
+    .hint{margin-top:6px; font-size:11px; color:rgba(147,164,184,.85)}
+    .miniEdit{border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.06); color:#dbe7f7; border-radius:10px; padding:6px 9px; font-size:11px; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent}
+    .miniEdit:active{transform:translateY(1px)}
+    .tools{display:flex; flex-wrap:wrap; gap:10px; padding:0 16px 16px}
+    .toolBtn{border:1px solid rgba(255,255,255,.08); background:rgba(27,39,54,.55); color:var(--text); border-radius:14px; padding:10px 12px; font-size:12px; cursor:pointer; touch-action:manipulation; user-select:none; -webkit-tap-highlight-color:transparent}
+    .toolBtn:active{transform:translateY(1px)}
+    .footer{padding:12px 16px 16px; color:rgba(147,164,184,.85); font-size:11px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .smallNote{opacity:.9}
+    @media (max-width:420px){.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div id="appSplash" class="splash" aria-hidden="true">
+    <div class="splashCard">
+      <img src="assets/TaskPulseSmart_Splash_1080x1920.png" alt="Task Pulse Smart splash" />
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <div>
+          <div class="title">Medication — Today</div>
+          <div class="sub">Task Pulse Smart • Meds Widget <span class="mono">V2.2</span></div>
+        </div>
+        <div class="tag">TLE routine</div>
+      </div>
+
+      <div id="banner" class="banner"></div>
+
+      <div class="grid">
+        <div class="row">
+          <button id="btnMorning" class="doseBtn" aria-label="Morning dose button">
+            <div class="doseTop">
+              <div class="doseName">Morning Dose</div>
+              <div id="pillMorning" class="statusPill">Not taken</div>
+            </div>
+            <div class="doseMeta">
+              <div id="timeMorning">—</div>
+              <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end;">
+                <div class="countdown" id="cdMorning">—</div>
+                <button type="button" id="editMorning" class="miniEdit">Edit</button>
+              </div>
+            </div>
+            <div class="hint">Tap to log • Long-press to undo • Edit for missed time</div>
+          </button>
+
+          <button id="btnNight" class="doseBtn" aria-label="Night dose button">
+            <div class="doseTop">
+              <div class="doseName">Night Dose</div>
+              <div id="pillNight" class="statusPill">Not taken</div>
+            </div>
+            <div class="doseMeta">
+              <div id="timeNight">—</div>
+              <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end;">
+                <div class="countdown" id="cdNight">—</div>
+                <button type="button" id="editNight" class="miniEdit">Edit</button>
+              </div>
+            </div>
+            <div class="hint">Tap to log • Long-press to undo • Edit for missed time</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="tools">
+        <button id="btnExport" class="toolBtn">Export</button>
+        <button id="btnImport" class="toolBtn">Import</button>
+        <button id="btnReset" class="toolBtn">Reset</button>
+      </div>
+
+      <div class="footer">
+        <div class="smallNote">Local storage key: <span class="mono">tp_meds_v2</span></div>
+        <div class="smallNote">Countdown: 12 hours from last logged dose.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const LS_KEY = 'tp_meds_v2';
+  const CONFIG = { longPressMs: 520, cooldownHours: 12, morningMissAfterHour: 12, nightMissAfterHour: 22 };
+  const pad2 = n => String(n).padStart(2,'0');
+  const now = () => new Date();
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const isSameDay = (a,b) => startOfDay(new Date(a)) === startOfDay(new Date(b));
+  const fmtTime = ts => !ts ? '—' : `${pad2(new Date(ts).getHours())}:${pad2(new Date(ts).getMinutes())}`;
+  const clamp0 = ms => Math.max(0, ms);
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+  function defaultState(){ return { v:2, history:{ morning:[], night:[] }, last:{ morning:null, night:null } }; }
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return defaultState();
+      const st = JSON.parse(raw);
+      if(!st || typeof st !== 'object') return defaultState();
+      st.history = st.history || { morning:[], night:[] };
+      st.last = st.last || { morning:null, night:null };
+      st.history.morning = Array.isArray(st.history.morning) ? st.history.morning : [];
+      st.history.night = Array.isArray(st.history.night) ? st.history.night : [];
+      return st;
+    }catch(e){ return defaultState(); }
+  }
+  function saveState(st){ localStorage.setItem(LS_KEY, JSON.stringify(st)); }
+  function vibrate(pattern){ try{ navigator.vibrate && navigator.vibrate(pattern); }catch(e){} }
+
+  let toastTimer = null;
+  function toast(msg){
+    const banner = document.getElementById('banner');
+    banner.style.display = 'block';
+    banner.style.background = 'rgba(64,156,255,.10)';
+    banner.style.color = '#cfe7ff';
+    banner.style.borderColor = 'rgba(64,156,255,.20)';
+    banner.textContent = msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => render(), 1400);
+  }
+
+  function logDose(type){
+    const st = loadState();
+    const t = Date.now();
+    st.history[type].push(t);
+    st.last[type] = t;
+    saveState(st);
+    vibrate(12);
+    render();
+  }
+
+  function undoDose(type){
+    const st = loadState();
+    if(!st.history[type].length){ toast(`${cap(type)}: nothing to undo`); vibrate([10,40,10]); return; }
+    st.history[type].pop();
+    st.last[type] = st.history[type].length ? st.history[type][st.history[type].length - 1] : null;
+    saveState(st);
+    toast(`${cap(type)} undone`);
+    vibrate(18);
+    render();
+  }
+
+  function parseHHMMToday(hhmm){
+    const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(hhmm).trim());
+    if(!m) return null;
+    const d = new Date();
+    d.setHours(parseInt(m[1],10), parseInt(m[2],10), 0, 0);
+    return d.getTime();
+  }
+
+  function addMissedDose(type, hhmm){
+    const ts = parseHHMMToday(hhmm);
+    if(!ts){ toast('Use HH:MM (24-hour), e.g. 07:30'); vibrate([10,40,10]); return; }
+    const st = loadState();
+    st.history[type].push(ts);
+    st.history[type].sort((a,b)=>a-b);
+    st.last[type] = st.history[type][st.history[type].length - 1];
+    saveState(st);
+    toast(`${cap(type)} added at ${hhmm}`);
+    vibrate(14);
+    render();
+  }
+
+  function editLastDoseTime(type, hhmm){
+    const ts = parseHHMMToday(hhmm);
+    if(!ts){ toast('Use HH:MM (24-hour), e.g. 07:30'); vibrate([10,40,10]); return; }
+    const st = loadState();
+    if(!st.history[type].length) st.history[type].push(ts);
+    else st.history[type][st.history[type].length - 1] = ts;
+    st.history[type].sort((a,b)=>a-b);
+    st.last[type] = st.history[type][st.history[type].length - 1];
+    saveState(st);
+    toast(`${cap(type)} last time set to ${hhmm}`);
+    vibrate(14);
+    render();
+  }
+
+  function takenToday(type, st){ const last = st.last[type]; return !!last && isSameDay(last, Date.now()); }
+  function remainingCooldown(type, st){ const last = st.last[type]; if(!last) return null; return clamp0((last + CONFIG.cooldownHours*60*60*1000) - Date.now()); }
+  function fmtRemaining(ms){ if(ms === null) return '—'; if(ms <= 0) return 'Ready'; const totalSec = Math.ceil(ms/1000); const h = Math.floor(totalSec/3600); const m = Math.floor((totalSec%3600)/60); return `${h}h ${pad2(m)}m`; }
+  function bannerText(st){
+    const hr = now().getHours();
+    const msgs = [];
+    if(hr >= CONFIG.morningMissAfterHour && !takenToday('morning', st)) msgs.push('Morning meds not taken');
+    if(hr >= CONFIG.nightMissAfterHour && !takenToday('night', st)) msgs.push('Night meds not taken');
+    return msgs.length ? msgs.join(' • ') : '';
+  }
+
+  function render(){
+    const st = loadState();
+    const mTaken = takenToday('morning', st); const nTaken = takenToday('night', st);
+    document.getElementById('pillMorning').textContent = mTaken ? 'Taken' : 'Not taken';
+    document.getElementById('pillNight').textContent = nTaken ? 'Taken' : 'Not taken';
+    document.getElementById('pillMorning').className = 'statusPill' + (mTaken ? ' good' : ' bad');
+    document.getElementById('pillNight').className = 'statusPill' + (nTaken ? ' good' : ' bad');
+    document.getElementById('timeMorning').textContent = 'Last: ' + fmtTime(st.last.morning);
+    document.getElementById('timeNight').textContent = 'Last: ' + fmtTime(st.last.night);
+    document.getElementById('cdMorning').textContent = fmtRemaining(remainingCooldown('morning', st));
+    document.getElementById('cdNight').textContent = fmtRemaining(remainingCooldown('night', st));
+    const banner = document.getElementById('banner');
+    const msg = bannerText(st);
+    if(msg){
+      banner.style.display='block'; banner.style.background='rgba(255,176,32,.10)'; banner.style.color='#ffd89a'; banner.style.borderColor='rgba(255,176,32,.20)'; banner.textContent=msg;
+    } else { banner.style.display='none'; banner.textContent=''; }
+  }
+
+  function bindDoseButton(btn, type){
+    let pressTimer = null, longFired = false, pointerActive = false;
+    const clear = () => { if(pressTimer) clearTimeout(pressTimer); pressTimer = null; pointerActive = false; };
+    btn.addEventListener('pointerdown', e => {
+      if(e.button !== undefined && e.button !== 0) return;
+      pointerActive = true; longFired = false;
+      try{ btn.setPointerCapture(e.pointerId); }catch(_){ }
+      pressTimer = setTimeout(() => { if(!pointerActive) return; longFired = true; undoDose(type); }, CONFIG.longPressMs);
+    }, { passive:true });
+    btn.addEventListener('pointerup', () => {
+      if(!pointerActive) return;
+      clearTimeout(pressTimer);
+      if(!longFired) logDose(type);
+      pointerActive = false; longFired = false;
+    }, { passive:true });
+    btn.addEventListener('pointercancel', () => { clear(); longFired = false; }, { passive:true });
+  }
+
+  function bindEditButton(btn, type){
+    const stop = e => { e.preventDefault(); e.stopPropagation(); };
+    btn.addEventListener('pointerdown', stop, { passive:false });
+    btn.addEventListener('click', e => {
+      stop(e);
+      const st = loadState();
+      const current = st.last[type] ? fmtTime(st.last[type]) : '';
+      const choice = prompt(`Edit ${cap(type)}:\n1 = Add missed dose (new entry)\n2 = Edit last dose time (adjust last entry)\n\nType 1 or 2`, '1');
+      if(!choice) return;
+      const hhmm = prompt('Enter time (HH:MM, 24-hour)', current || '07:30');
+      if(!hhmm) return;
+      if(choice.trim() === '1') addMissedDose(type, hhmm);
+      else if(choice.trim() === '2') editLastDoseTime(type, hhmm);
+      else toast('Choose 1 or 2');
+    }, { passive:false });
+  }
+
+  function exportData(){
+    const st = loadState();
+    const blob = new Blob([JSON.stringify(st, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tp_meds_v2_export_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast('Export created');
+  }
+  function importData(){
+    const input = document.createElement('input'); input.type='file'; input.accept='application/json';
+    input.onchange = async () => {
+      const file = input.files && input.files[0]; if(!file) return;
+      try{
+        const obj = JSON.parse(await file.text());
+        if(!obj || typeof obj !== 'object' || !obj.history || !obj.last){ toast('Invalid file'); vibrate([10,40,10]); return; }
+        localStorage.setItem(LS_KEY, JSON.stringify(obj)); toast('Import complete'); vibrate(16); render();
+      }catch(e){ toast('Import failed'); vibrate([10,40,10]); }
+    };
+    input.click();
+  }
+  function resetData(){ if(!confirm('Reset medication history and timers?')) return; localStorage.removeItem(LS_KEY); toast('Reset done'); render(); }
+
+  function hideSplash(){ setTimeout(() => document.getElementById('appSplash').classList.add('hidden'), 900); }
+
+  bindDoseButton(document.getElementById('btnMorning'), 'morning');
+  bindDoseButton(document.getElementById('btnNight'), 'night');
+  bindEditButton(document.getElementById('editMorning'), 'morning');
+  bindEditButton(document.getElementById('editNight'), 'night');
+  document.getElementById('btnExport').addEventListener('click', exportData);
+  document.getElementById('btnImport').addEventListener('click', importData);
+  document.getElementById('btnReset').addEventListener('click', resetData);
+  render();
+  hideSplash();
+  setInterval(render, 30000);
+  if('serviceWorker' in navigator){ window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(()=>{}); }); }
+})();
+</script>
+</body>
+</html>
